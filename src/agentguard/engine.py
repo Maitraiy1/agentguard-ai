@@ -34,8 +34,13 @@ class Engine:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1, 2):
                 raise ValueError("Unsupported database schema version")
-            if version == 0 and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").fetchone():
+            tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'")}
+            if version == 0 and tables:
                 raise ValueError("Refusing an unrecognized nonempty database")
+            if version in (1, 2) and not {"requests", "audit"} <= tables:
+                raise ValueError("Database does not contain the expected AgentGuard schema")
+            if version == 2 and not {"policy_state", "revocations"} <= tables:
+                raise ValueError("Incomplete AgentGuard schema v2")
             schema = """
                 CREATE TABLE IF NOT EXISTS requests (
                     id TEXT PRIMARY KEY, action TEXT NOT NULL, digest TEXT NOT NULL,

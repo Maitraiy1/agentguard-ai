@@ -120,16 +120,18 @@ class OperationalTests(unittest.TestCase):
             worker.execute(self.action, lambda _: self.fail('called'))
 
     def test_unrecognized_database_is_not_modified(self):
-        path = self.root / 'unrelated.sqlite3'
-        with contextlib.closing(sqlite3.connect(path)) as db, db:
-            db.execute('CREATE TABLE unrelated(value TEXT)')
-            db.execute("INSERT INTO unrelated VALUES('keep')")
-        with self.assertRaises(ValueError):
-            Engine(path, self.policy, reviewers={'human'})
-        with contextlib.closing(sqlite3.connect(path)) as db:
-            self.assertEqual(db.execute('SELECT value FROM unrelated').fetchone()[0], 'keep')
-            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 0)
-            self.assertIsNone(db.execute("SELECT name FROM sqlite_master WHERE name='requests'").fetchone())
+        for version in (0, 1, 2):
+            path = self.root / f'unrelated-{version}.sqlite3'
+            with contextlib.closing(sqlite3.connect(path)) as db, db:
+                db.execute('CREATE TABLE unrelated(value TEXT)')
+                db.execute("INSERT INTO unrelated VALUES('keep')")
+                db.execute(f'PRAGMA user_version={version}')
+            with self.assertRaises(ValueError):
+                Engine(path, self.policy, reviewers={'human'})
+            with contextlib.closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute('SELECT value FROM unrelated').fetchone()[0], 'keep')
+                self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], version)
+                self.assertIsNone(db.execute("SELECT name FROM sqlite_master WHERE name='requests'").fetchone())
 
     def test_migrate_v1_invalidates_legacy_requests(self):
         path = self.root / 'legacy.sqlite3'
