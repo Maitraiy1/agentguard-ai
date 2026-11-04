@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem (no secrets or security exploit details).
+body:
+  - type: markdown
+    attributes:
+      value: For vulnerabilities, use Security → Report a vulnerability. Remove passwords, tokens and real action payloads from logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version, Python version and operating system
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Commands, expected behavior and actual behavior using harmless sample data.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted error output
+      render: text

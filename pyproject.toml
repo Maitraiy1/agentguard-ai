@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentguard-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "Default-deny policy checks and human approval gates for Python agent tools"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,6 +13,14 @@ authors = [{name = "AgentGuard AI contributors"}]
 keywords = ["agents", "security", "approval", "automation"]
 classifiers = ["Programming Language :: Python :: 3", "Topic :: Security"]
 dependencies = []
+
+[project.optional-dependencies]
+browser = ["playwright==1.64.1"]
+
+[project.urls]
+Repository = "https://github.com/Maitraiy1/agentguard-ai"
+Issues = "https://github.com/Maitraiy1/agentguard-ai/issues"
+Changelog = "https://github.com/Maitraiy1/agentguard-ai/blob/main/CHANGELOG.md"
 
 [project.scripts]
 agentguard = "agentguard.cli:main"

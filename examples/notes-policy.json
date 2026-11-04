@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "tool": "notes.create",
+      "resource": "local-notes",
+      "principal": "demo-agent",
+      "decision": "approval",
+      "parameters": {
+        "filename": {"type": "string", "enum": ["approved-note.txt", "meeting-note.txt"]},
+        "text": {"type": "string", "max_length": 2048}
+      }
+    }
+  ]
+}

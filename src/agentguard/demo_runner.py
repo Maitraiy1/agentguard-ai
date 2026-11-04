@@ -58,8 +58,10 @@ def wait_and_execute(engine: Engine, action: Action, request_id: str, *,
         row = engine.inspect(request_id)
         if row["digest"] != action.digest or row["policy"] != engine.policy.digest:
             raise ApprovalError("Request does not match the action and policy")
-        if row["status"] == "denied":
-            return "denied"
+        if row["status"] in ("denied", "revoked"):
+            return row["status"]
+        if not row.get("policy_current", True):
+            raise ApprovalError("Request invalidated by policy activation or upgrade")
         if row["status"] == "consumed":
             return "already consumed"
         if engine.clock() >= row["expires"]:
