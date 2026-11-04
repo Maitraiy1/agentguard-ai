@@ -76,7 +76,8 @@ class Engine:
             raise ValueError("ttl must be an integer between 1 and 3600 seconds")
         if self.policy.evaluate(action) != Decision.APPROVAL:
             raise ApprovalError("Policy does not permit an approval request")
-        request_id = secrets.token_urlsafe(32)
+        # Prefix prevents random leading hyphens from being parsed as CLI flags.
+        request_id = "req_" + secrets.token_urlsafe(32)
         with self._transaction() as db:
             db.execute("INSERT INTO requests(id,action,digest,policy,expires,status,reviewer) VALUES(?,?,?,?,?,?,?)",
                        (request_id, canonical(action.as_dict()), action.digest,

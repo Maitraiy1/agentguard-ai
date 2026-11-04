@@ -78,6 +78,10 @@ agentguard --reviewer operator review REQUEST_ID --as operator --approve
 agentguard audit
 ```
 
+New request IDs start with `req_` followed by 256 bits of URL-safe randomness. Existing
+IDs remain valid. For a legacy ID that begins with a hyphen, use the CLI end-of-options
+separator, for example `agentguard inspect -- -LEGACY_ID`.
+
 Omit `--approve` to deny a request. Inspect the **entire payload**, resource and principal
 before approving. Request IDs are not sufficient authority to execute; the state, policy,
 reviewer and fingerprint are rechecked by the API. The CLI intentionally has no execution
