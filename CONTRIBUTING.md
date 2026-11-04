@@ -27,3 +27,15 @@ All CI jobs must pass. Keep the default-deny behavior and fail-closed storage se
 Schema changes require an explicit migration plan; do not silently reinterpret old state.
 
 By submitting a contribution you agree that it is licensed under the project's MIT license.
+
+## Browser and security changes
+
+For dashboard/authentication changes, install the optional browser extra and run the Chromium
+walkthrough described in README.md. CI stores test-only screenshots and video artifacts.
+For policy/state changes, cover revocation, stale workers, migration rollback and storage
+failure. Explain any schema change and upgrade behavior. Never weaken checks to make tests pass.
+
+AI-assisted contributions are welcome. State what changed and how you actually verified it;
+do not claim an independent audit, users or test results that did not occur. Maintainers must
+review generated code and remain responsible for changes. Genuine bugs, platform permission
+tests, accessibility and operational documentation are useful contribution areas.

@@ -1,8 +1,8 @@
-# Local reviewer dashboard (v0.2.0)
+# Local reviewer dashboard (v0.3.0)
 
 This is a password-authenticated, single-reviewer website for your laptop. It uses the
 existing Engine API and SQLite state. It can list, inspect, approve and deny requests and
-show audit events. It does not execute tools or accept requests from remote agents.
+show audit events. It does not execute tools or accept requests from remote agents. Current pending/approved requests can be revoked with **Revoke permission**.
 
 ## Windows PowerShell setup
 
@@ -39,7 +39,7 @@ in place of `.\.venv\Scripts\python.exe` in the remaining commands.
 ## Existing agent integration
 
 Both processes must use the same trusted policy file and database path. The dashboard loads
-policy at startup; stop and restart it whenever policy changes. Its configured reviewer is
+policy at startup; stop workers, explicitly activate policy with the trusted local CLI, and restart it whenever policy changes. See POLICIES.md. Its configured reviewer is
 the only permitted reviewer in its Engine instance. Configure that same reviewer allowlist
 in the trusted execution service too; approval alone is not tool execution.
 
@@ -90,3 +90,7 @@ then restart; there is no online password reset or multi-factor login in this pr
 Authenticated pages expose full action parameters. Don't use real secrets in demo actions.
 Request display is bounded to the newest 100 rows. Login attempts are not persisted in the
 audit database; the audit page shows engine events, not a complete authentication log.
+
+For a real note-writing integration, use QUICKSTART.md and the separate notes policy/database.
+For schema migration, backup/restore, audit export and retention, read OPERATIONS.md before
+upgrading. All pre-v0.3 pending approvals are invalidated; passwords and audit history remain.

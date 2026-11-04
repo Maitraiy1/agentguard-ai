@@ -175,6 +175,47 @@ class OperationalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.engine.prune(before=6000, actor='admin')
 
+    def test_maintenance_cli_and_revocation(self):
+        import io
+        from agentguard.cli import main
+        config = self.root / 'policy.json'
+        config.write_text(json.dumps({'rules': [{'tool': 't', 'resource': 'r', 'principal': 'p', 'decision': 'approval'}]}))
+        args = ['--db', str(self.engine.database), '--policy', str(config), '--reviewer', 'human']
+        def run(tail):
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                return main(args + tail)
+        request = self.approved()
+        self.assertEqual(run(['revoke', request, '--as', 'human']), 0)
+        self.assertEqual(self.engine.inspect(request)['status'], 'revoked')
+        backup = str(self.root / 'backup.sqlite3')
+        self.assertEqual(run(['backup', backup]), 0)
+        self.assertEqual(run(['backup', backup]), 1)
+        self.assertEqual(run(['export-audit', str(self.root / 'audit.jsonl')]), 0)
+        self.assertEqual(run(['activate-policy', '--as', 'admin']), 0)
+        self.assertEqual(run(['restore', backup, str(self.root / 'restored.sqlite3'), '--as', 'admin']), 0)
+        self.assertEqual(run(['prune', '--before', '0', '--as', 'admin']), 0)
+
+    def test_migration_failure_rolls_back_schema(self):
+        path = self.root / 'legacy-failure.sqlite3'
+        with contextlib.closing(sqlite3.connect(path)) as db, db:
+            db.execute('CREATE TABLE requests(id TEXT PRIMARY KEY,action TEXT,digest TEXT,policy TEXT,expires REAL,status TEXT,reviewer TEXT)')
+            db.execute('CREATE TABLE audit(sequence INTEGER PRIMARY KEY AUTOINCREMENT,timestamp REAL,event TEXT,request_id TEXT,actor TEXT,digest TEXT)')
+            db.execute("CREATE TRIGGER fail_audit BEFORE INSERT ON audit BEGIN SELECT RAISE(ABORT, 'unavailable'); END")
+            db.execute('PRAGMA user_version=1')
+        with self.assertRaises(sqlite3.Error):
+            Engine(path, self.policy, reviewers={'human'})
+        with contextlib.closing(sqlite3.connect(path)) as db:
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 1)
+            columns = {r[1] for r in db.execute('PRAGMA table_info(requests)')}
+            self.assertNotIn('generation', columns)
+        # Backup must remain usable before a v1 engine migration is possible.
+        import io
+        from agentguard.cli import main
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(['--db', str(path), 'backup', str(self.root / 'legacy-backup.sqlite3')]), 0)
+        with contextlib.closing(sqlite3.connect(path)) as db:
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 1)
+
 
 class NoteTests(unittest.TestCase):
     def setUp(self):
