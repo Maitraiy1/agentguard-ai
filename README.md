@@ -4,8 +4,8 @@ A small, dependency-free Python gate for AI-agent tools: **deny by default, requ
 approval for selected actions, and record local audit events**.
 
 This production-oriented starter implements a secure MVP foundation. It is early software,
-not independently audited. It does not execute arbitrary shell commands, authenticate users
-or sandbox agents. See [the security model](docs/SECURITY_MODEL.md).
+not independently audited. The core engine does not execute arbitrary shell commands, authenticate users
+or sandbox agents. The optional local dashboard adds single-reviewer password login. See [the security model](docs/SECURITY_MODEL.md).
 
 ## What works
 
@@ -33,6 +33,21 @@ python examples/demo.py
 
 The demo prints the exact review payload, approves using a demo trusted operator identity,
 executes a harmless handler and demonstrates replay prevention. It makes no network calls.
+
+## Local approval dashboard (development preview)
+
+A password-protected reviewer interface is included for local evaluation. It lists requests,
+shows the exact action payload, supports approve/deny decisions and displays audit events.
+It binds to `127.0.0.1` and never executes tools.
+
+```sh
+python -m agentguard.dashboard init
+python -m agentguard.dashboard serve --demo
+```
+
+Create a password when prompted, open **http://127.0.0.1:8765**, sign in and inspect the demo
+request. Use Approve or Deny, then check Audit history. This is an early local preview, not
+a public hosting server. See [Windows setup and authentication details](docs/DASHBOARD.md).
 
 ## Local CLI
 

@@ -27,3 +27,13 @@ connection closure. They now use contextlib.closing together with the transactio
 so commit/rollback happens before close, including on exceptions. The production engine
 already explicitly closes its connections. All 25 tests pass after this correction on Linux.
 Windows execution still needs confirmation from the user's rerun or GitHub Actions.
+
+## Dashboard development preview
+
+All 44 tests pass on Linux CPython 3.12, including 19 new dashboard/authentication tests.
+The HTTP tests start a real loopback server on an ephemeral port and verify authentication,
+protected pages, HTML escaping, CSRF and Origin/Host validation, reviewer identity binding,
+approval/denial, expiry, logout, rate limiting, input limits and absence of an execution route.
+The original v0.1.0 CI passed across Linux/Windows on Python 3.11–3.14. The new dashboard's
+Windows and Python matrix results have not yet been verified. This is a development preview,
+not a v0.2.0 release or a completed production security review.

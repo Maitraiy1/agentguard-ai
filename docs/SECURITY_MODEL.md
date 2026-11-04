@@ -12,7 +12,7 @@ anyone. Do not expose it to an agent as a general command tool.
 An agent that can edit Python, the policy, the database, process memory or call the real
 tool directly can bypass this library. Isolate agents from the trusted host and route every
 side-effecting tool through `Engine.execute`. Use OS accounts, narrow credentials and a
-sandbox appropriate to the host application. This MVP supplies no HTTP service or login.
+sandbox appropriate to the host application. The core engine supplies no authentication. The optional loopback dashboard supplies single-reviewer password login; see [its operating limits](DASHBOARD.md).
 
 ## Guarantees within that boundary
 
@@ -66,8 +66,9 @@ content changes; reverting to an old policy can make still-unexpired requests va
 Use a new database when a policy change must irreversibly revoke all outstanding requests.
 
 TTL uses the host wall clock; keep it synchronized. A clock rollback can extend validity.
-There is no distributed authorization, multi-host coordination, revocation endpoint,
-rate limiting, tenant isolation, database migration framework or GUI in this MVP.
+The core engine has no distributed authorization, multi-host coordination, revocation endpoint,
+rate limiting, tenant isolation or database migration framework. The optional local dashboard
+adds a reviewer GUI and a local login throttle, not public-service authentication infrastructure.
 
 ## Deployment checklist
 
