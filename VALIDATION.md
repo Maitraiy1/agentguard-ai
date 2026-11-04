@@ -62,12 +62,15 @@ security audit, public hosting deployment or PyPI publication is claimed.
 
 ## v0.3 local toolkit
 
-The local standard-library suite has 75 tests after operational regression additions. The
+The local standard-library suite has 76 tests after operational regression additions. The
 first v0.3 candidate's 73-test suite passed the complete Linux/Windows Python 3.11–3.14 matrix,
 package validation, real Chromium walkthrough and CodeQL in CI run 41843747441 (CodeQL run
-41843747458). The two later additions cover maintenance CLI flows and schema rollback on
-injected migration failure. The final candidate must pass CI before release.
+41843747458). Later additions cover maintenance CLI flows, schema rollback on injected migration failure
+and refusal to modify an unrelated nonempty SQLite database. The final candidate must pass CI before release.
 
 The committed screenshot/video proof was produced by that real automated Chromium run using
 only test credentials and sample actions. The recording is slowed five times for readability.
 This is not independent security review, external-user validation or evidence of adoption.
+
+A final upgrade-safety regression verifies that an unrelated nonempty SQLite database is
+refused without modification, rather than silently acquiring AgentGuard tables.

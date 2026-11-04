@@ -34,6 +34,8 @@ class Engine:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1, 2):
                 raise ValueError("Unsupported database schema version")
+            if version == 0 and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").fetchone():
+                raise ValueError("Refusing an unrecognized nonempty database")
             schema = """
                 CREATE TABLE IF NOT EXISTS requests (
                     id TEXT PRIMARY KEY, action TEXT NOT NULL, digest TEXT NOT NULL,
