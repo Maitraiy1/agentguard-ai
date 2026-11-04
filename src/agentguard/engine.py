@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import math
 import secrets
 import sqlite3
 import time
@@ -30,15 +32,22 @@ class Engine:
         self.clock = clock
         with self._transaction() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise ValueError("Unsupported database schema version")
+            tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'")}
+            if version == 0 and tables:
+                raise ValueError("Refusing an unrecognized nonempty database")
+            if version in (1, 2) and not {"requests", "audit"} <= tables:
+                raise ValueError("Database does not contain the expected AgentGuard schema")
+            if version == 2 and not {"policy_state", "revocations"} <= tables:
+                raise ValueError("Incomplete AgentGuard schema v2")
             schema = """
                 CREATE TABLE IF NOT EXISTS requests (
                     id TEXT PRIMARY KEY, action TEXT NOT NULL, digest TEXT NOT NULL,
                     policy TEXT NOT NULL, expires REAL NOT NULL,
                     status TEXT NOT NULL CHECK(status IN
                         ('pending','approved','denied','consumed')),
-                    reviewer TEXT
+                    reviewer TEXT, generation INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS audit (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +58,15 @@ class Engine:
             for statement in schema.split(";"):
                 if statement.strip():
                     db.execute(statement)
-            db.execute("PRAGMA user_version=1")
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(requests)")}
+            if "generation" not in columns:
+                db.execute("ALTER TABLE requests ADD COLUMN generation INTEGER NOT NULL DEFAULT 0")
+            db.execute("CREATE TABLE IF NOT EXISTS revocations (request_id TEXT PRIMARY KEY, actor TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS policy_state (id INTEGER PRIMARY KEY CHECK(id=1), digest TEXT NOT NULL, generation INTEGER NOT NULL)")
+            db.execute("INSERT OR IGNORE INTO policy_state VALUES(1,?,1)", (self.policy.digest,))
+            db.execute("PRAGMA user_version=2")
+            if version == 1:
+                self._audit(db, "schema_migrated", "system", self.policy.digest)
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -79,16 +96,22 @@ class Engine:
         # Prefix prevents random leading hyphens from being parsed as CLI flags.
         request_id = "req_" + secrets.token_urlsafe(32)
         with self._transaction() as db:
-            db.execute("INSERT INTO requests(id,action,digest,policy,expires,status,reviewer) VALUES(?,?,?,?,?,?,?)",
+            generation = self._current(db)
+            db.execute("INSERT INTO requests(id,action,digest,policy,expires,status,reviewer,generation) VALUES(?,?,?,?,?,?,?,?)",
                        (request_id, canonical(action.as_dict()), action.digest,
-                        self.policy.digest, self.clock() + ttl, "pending", None))
+                        self.policy.digest, self.clock() + ttl, "pending", None, generation))
             self._audit(db, "requested", action.principal, action.digest, request_id)
         return request_id
 
     def _active(self, db: sqlite3.Connection, request_id: str) -> sqlite3.Row:
+        generation = self._current(db)
         row = db.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
         if row is None:
             raise ApprovalError("Unknown approval request")
+        if db.execute("SELECT 1 FROM revocations WHERE request_id=?", (request_id,)).fetchone():
+            raise ApprovalError("Approval request revoked")
+        if row["generation"] != generation:
+            raise ApprovalError("Approval invalidated by policy activation or upgrade")
         if self.clock() >= row["expires"]:
             raise ApprovalError("Approval request expired")
         if row["policy"] != self.policy.digest:
@@ -124,6 +147,7 @@ class Engine:
                 self._audit(db, "blocked", action.principal, action.digest, request_id)
             raise ApprovalError("Action denied by policy")
         with self._transaction() as db:
+            self._current(db)
             if decision == Decision.APPROVAL:
                 if request_id is None:
                     raise ApprovalError("Approval is required")
@@ -152,8 +176,7 @@ class Engine:
             if row is None:
                 raise ApprovalError("Unknown approval request")
             result = dict(row)
-            result["action"] = json.loads(result["action"])
-            return result
+            return self._decorate(db, result)
 
     def audit(self, *, limit: int = 100) -> list[dict[str, Any]]:
         if type(limit) is not int or not 1 <= limit <= 1000:
@@ -171,6 +194,77 @@ class Engine:
             results = []
             for row in rows:
                 item = dict(row)
-                item["action"] = json.loads(item["action"])
-                results.append(item)
+                results.append(self._decorate(db, item))
             return results
+
+    def _current(self, db: sqlite3.Connection) -> int:
+        row = db.execute("SELECT digest,generation FROM policy_state WHERE id=1").fetchone()
+        if row is None or row["digest"] != self.policy.digest:
+            raise ApprovalError("Worker policy is not active; restart workers with the active policy")
+        return row["generation"]
+
+    def _decorate(self, db: sqlite3.Connection, result: dict[str, Any]) -> dict[str, Any]:
+        result["action"] = json.loads(result["action"])
+        state = db.execute("SELECT digest,generation FROM policy_state WHERE id=1").fetchone()
+        result["policy_current"] = (state["digest"] == self.policy.digest == result["policy"]
+                                    and state["generation"] == result["generation"])
+        if db.execute("SELECT 1 FROM revocations WHERE request_id=?", (result["id"],)).fetchone():
+            result["status"] = "revoked"
+        return result
+
+    def activate_policy(self, *, actor: str) -> int:
+        """Privileged local administration: activate policy and invalidate all old approvals.
+
+        The host must authenticate/authorize this operation. Never expose it to agents.
+        Every activation increments the durable generation, even for identical content.
+        """
+        label(actor, "actor")
+        with self._transaction() as db:
+            db.execute("UPDATE policy_state SET digest=?,generation=generation+1 WHERE id=1", (self.policy.digest,))
+            generation = self._current(db)
+            self._audit(db, "policy_activated", actor, self.policy.digest)
+            return generation
+
+    def revoke(self, request_id: str, *, reviewer: str) -> None:
+        if reviewer not in self.reviewers:
+            raise ApprovalError("Reviewer is not authorized")
+        with self._transaction() as db:
+            self._current(db)
+            row = db.execute("SELECT * FROM requests WHERE id=?", (request_id,)).fetchone()
+            if row is None or row["status"] not in ("pending", "approved"):
+                raise ApprovalError("Only pending or approved requests can be revoked")
+            if db.execute("SELECT 1 FROM revocations WHERE request_id=?", (request_id,)).fetchone():
+                raise ApprovalError("Request is already revoked")
+            db.execute("INSERT INTO revocations VALUES(?,?)", (request_id, reviewer))
+            self._audit(db, "revoked", reviewer, row["digest"], request_id)
+
+    def prune(self, *, before: float, actor: str, apply: bool = False,
+              audit_before: float | None = None) -> dict[str, int]:
+        """Preview or delete old terminal/expired requests and optionally old audit events.
+
+        Privileged local maintenance; export/backup first. Pending live requests are retained.
+        """
+        label(actor, "actor")
+        if type(apply) is not bool:
+            raise ValueError("apply must be a boolean")
+        if before is None:
+            raise ValueError("before is required")
+        for cutoff in (before, audit_before):
+            if cutoff is not None and (type(cutoff) not in (float, int) or not math.isfinite(cutoff)
+                                      or cutoff < 0 or cutoff > self.clock()):
+                raise ValueError("Cutoffs must be finite past Unix timestamps")
+        condition = "expires < ? AND (status IN ('denied','consumed') OR expires <= ? OR id IN (SELECT request_id FROM revocations))"
+        with self._transaction() as db:
+            self._current(db)
+            args = (before, self.clock())
+            requests = db.execute("SELECT COUNT(*) FROM requests WHERE " + condition, args).fetchone()[0]
+            audit = 0 if audit_before is None else db.execute("SELECT COUNT(*) FROM audit WHERE timestamp < ?", (audit_before,)).fetchone()[0]
+            counts = {"requests": requests, "audit": audit}
+            if apply:
+                db.execute("DELETE FROM revocations WHERE request_id IN (SELECT id FROM requests WHERE " + condition + ")", args)
+                db.execute("DELETE FROM requests WHERE " + condition, args)
+                if audit_before is not None:
+                    db.execute("DELETE FROM audit WHERE timestamp < ?", (audit_before,))
+                digest = hashlib.sha256(canonical(counts).encode()).hexdigest()
+                self._audit(db, "retention_applied", actor, digest)
+            return counts

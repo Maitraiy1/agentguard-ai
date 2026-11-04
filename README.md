@@ -1,175 +1,161 @@
 # AgentGuard AI
 
-Version **0.2.0** adds the local reviewer dashboard and approval-to-execution demo.
-See [CHANGELOG.md](CHANGELOG.md) for release details. This remains an early local MVP.
+[![CI](https://github.com/Maitraiy1/agentguard-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Maitraiy1/agentguard-ai/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Maitraiy1/agentguard-ai/actions/workflows/security.yml/badge.svg)](https://github.com/Maitraiy1/agentguard-ai/actions/workflows/security.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A small, dependency-free Python gate for AI-agent tools: **deny by default, require human
-approval for selected actions, and record local audit events**.
+**Default-deny policy checks and human approvals for Python agent tools.**
 
-This production-oriented starter implements a secure MVP foundation. It is early software,
-not independently audited. The core engine does not execute arbitrary shell commands, authenticate users
-or sandbox agents. The optional local dashboard adds single-reviewer password login. See [the security model](docs/SECURITY_MODEL.md).
+An agent proposes an exact action. Your policy checks identity and parameters. A human
+reviews sensitive actions in a local dashboard. A trusted adapter consumes the approval
+once, executes the action and records the result.
+
+Version **0.3.0** is an early **local evaluation toolkit**, not a sandbox or a public hosting
+service. The host, tool adapters and configuration remain trusted. No independent security
+audit, broad adoption or production guarantee is claimed.
+
+![Local reviewer dashboard](docs/media/dashboard.png)
+
+[Watch the recorded Chromium walkthrough](docs/media/walkthrough.mp4) ·
+[Audit screenshot](docs/media/audit.png) · [Changelog](CHANGELOG.md)
+
+The recording is a real automated browser run, slowed five times for readability. Test-only
+sample data is shown. Browser tests also verify that an approved note file is created and a
+denied note is not. It is not a recording of a production deployment.
 
 ## What works
 
-- Exact policy matching with deny > approval > allow precedence.
-- Immutable action snapshots and deterministic SHA-256 fingerprints.
-- Human approval tied to the action, principal and policy; configurable expiry (1–3600s).
-- Reviewer allowlist, self-approval prevention and atomic single-use consumption.
-- Durable SQLite state and metadata audit records; safe concurrent consumption.
-- Python API, local operator CLI, example, standard-library tests and GitHub Actions CI.
+- Exact tool/resource/principal policies with deny > approval > allow precedence.
+- Strict parameter types, destination allowlists, extra-key rejection and size/range limits.
+- Immutable action snapshots and SHA-256 fingerprints binding approvals to exact payloads.
+- Expiring single-use approvals, reviewer allowlists and self-approval prevention.
+- Reviewer revocation and durable policy generations: old approvals stay invalid after rollback.
+- Password-authenticated local dashboard, request inspection and audit history.
+- A useful create-only text-note adapter that refuses traversal, device names and overwrites.
+- SQLite schema migration, backup/restore, metadata-only audit export and retention previews.
+- Zero runtime dependencies; Python 3.11+; MIT license.
 
-## Quick start
+## Quick start — Windows PowerShell
 
-Requires Python 3.11+. Run from this repository directory.
-
-```sh
+```powershell
+git clone https://github.com/Maitraiy1/agentguard-ai.git
+cd agentguard-ai
 python -m venv .venv
-# Linux/macOS:
-. .venv/bin/activate
-# Windows PowerShell:
-# .venv\Scripts\Activate.ps1
-python -m pip install -e .
-python -m unittest discover -s tests -v
-python examples/demo.py
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m agentguard.dashboard init
 ```
 
-The demo prints the exact review payload, approves using a demo trusted operator identity,
-executes a harmless handler and demonstrates replay prevention. It makes no network calls.
+Choose a unique 12+ character password. Keep `.agentguard` private and outside the agent's
+access. Start the notes dashboard in the first window:
 
-## Local approval dashboard (development preview)
-
-A password-protected reviewer interface is included for local evaluation. It lists requests,
-shows the exact action payload, supports approve/deny decisions and displays audit events.
-It binds to `127.0.0.1` and never executes tools.
-
-```sh
-python -m agentguard.dashboard init
-python -m agentguard.dashboard serve --demo
+```powershell
+.\.venv\Scripts\python.exe -m agentguard.dashboard --db .agentguard\notes.sqlite3 --policy examples\notes-policy.json serve
 ```
 
-Create a password when prompted, open **http://127.0.0.1:8765**, sign in and inspect the demo
-request. Use Approve or Deny, then check Audit history. This is an early local preview, not
-a public hosting server. See [Windows setup and authentication details](docs/DASHBOARD.md).
+In a **second PowerShell window in the same folder**:
 
-## Full approval-to-execution demo
-
-Keep the local dashboard running. In a second terminal, from this project folder:
-
-```sh
-python -m agentguard.demo_runner
+```powershell
+.\.venv\Scripts\python.exe -m agentguard.notes
 ```
 
-The runner creates a fresh request and waits. Inspect that request in the dashboard and
-approve it: a fixed harmless message prints in the runner terminal, and execution events
-appear in audit history. Deny a new request to verify that nothing runs. No shell commands,
-external messages or output files are produced by the tool. See the
-[two-window Windows walkthrough](docs/DEMO_RUNNER.md).
+Open **http://127.0.0.1:8765**, sign in, refresh Requests and inspect the ID printed by the
+runner. Approve it: `.agentguard/notes/approved-note.txt` is created, and Audit history records
+execution events. Deny a new request and the file is not created. Existing files are never
+overwritten. [Full walkthrough and expected failures](docs/QUICKSTART.md).
 
-## Local CLI
+On Linux/macOS use `python -m venv .venv`, activate with `. .venv/bin/activate`, then use
+`python` for the remaining module commands. CI verifies the note adapter on Linux and Windows.
 
-On POSIX first set `umask 077`; on Windows set private NTFS permissions for the state folder.
-
-```sh
-agentguard init
-agentguard check examples/action.json
-# Expected: approval, exit code 2 (the shell commands below remain separate).
-agentguard request examples/action.json --ttl 300
-# Copy the returned request_id in place of REQUEST_ID:
-agentguard inspect REQUEST_ID
-agentguard --reviewer operator review REQUEST_ID --as operator --approve
-agentguard audit
-```
-
-New request IDs start with `req_` followed by 256 bits of URL-safe randomness. Existing
-IDs remain valid. For a legacy ID that begins with a hyphen, use the CLI end-of-options
-separator, for example `agentguard inspect -- -LEGACY_ID`.
-
-Omit `--approve` to deny a request. Inspect the **entire payload**, resource and principal
-before approving. Request IDs are not sufficient authority to execute; the state, policy,
-reviewer and fingerprint are rechecked by the API. The CLI intentionally has no execution
-command; real execution belongs in a trusted application integration.
-
-CLI `check` exits 0 for allow, 2 for approval/deny; operational errors exit 1.
-Other successful commands exit 0. `--policy`, `--db`, and `--reviewer` precede the subcommand.
-Flags identify local trusted configuration, not authenticated identities.
+**Upgrading from v0.2?** Stop workers and read [OPERATIONS.md](docs/OPERATIONS.md) before
+opening a database. Schema v2 invalidates pre-upgrade pending approvals; credentials and
+audit history remain. Back up first. Old binaries refuse the upgraded schema.
 
 ## Python integration
 
 ```python
-from agentguard import Action, Decision, Engine, Policy, Rule
+from agentguard import Action, Decision, Engine, ParameterSchema, Policy, Rule
 
-policy = Policy((
-    Rule("notes.publish", "notes/demo", "worker", Decision.APPROVAL),
-))
-# Create/protect this directory before starting the trusted service.
+policy = Policy((Rule(
+    "notes.create", "local-notes", "worker", Decision.APPROVAL,
+    ParameterSchema({
+        "filename": {"type": "string", "enum": ["approved-note.txt"]},
+        "text": {"type": "string", "max_length": 2048},
+    }),
+),))
+# Prepare a private directory and trusted authenticated reviewer integration first.
 engine = Engine(".agentguard/state.sqlite3", policy, reviewers={"operator"})
-action = Action("notes.publish", "notes/demo", "worker", {"text": "Hello"})
+action = Action("notes.create", "local-notes", "worker", {
+    "filename": "approved-note.txt", "text": "Proposed note",
+})
 request_id = engine.request(action, ttl=300)
-
-# Display engine.inspect(request_id) in your trusted reviewer UI.
-# Only after authenticating the actual reviewer and obtaining their decision:
+# Render engine.inspect(request_id) in your authenticated reviewer interface.
+# Only after the real reviewer decides:
 engine.review(request_id, reviewer="operator", approve=True)
-
-# Replace this harmless handler with a narrow schema-validated tool adapter.
-result = engine.execute(
-    action,
-    lambda approved: approved.parameters["text"],
-    request_id=request_id,
-)
+# Supply a trusted adapter that validates and operates solely on this snapshot:
+engine.execute(action, lambda approved: print(approved.parameters["text"]), request_id=request_id)
 ```
 
-Get identities from your trusted authentication layer. Never let the agent set the reviewer,
-policy, reviewer allowlist, database path or real tool adapter. Route every protected tool
-through `execute`. `Action.parameters` returns a copy; changing it never changes the action.
+The example handler only prints. For real note writes use the complete trusted-host example
+in [docs/INTEGRATION.md](docs/INTEGRATION.md). Actor/reviewer strings are identifiers, not
+authentication tokens. Agents must not select policies, reviewer allowlists, adapters or
+administrative commands. Route every protected side effect through `Engine.execute`.
 
-`request` only accepts actions whose policy decision is approval. `execute` raises
-`ApprovalError` for blocked actions. Allowed actions need no approval ID and may execute
-repeatedly. Approval consumption happens **before** the handler; failures burn the approval.
-A handler side effect can succeed even if recording its final audit event fails. Reconcile
-external state before retrying. See the security model for concurrency and crash semantics.
+## Local operator CLI
 
-## Policy format
+Global options (`--db`, `--policy`, repeatable `--reviewer`) precede the subcommand.
 
-See [examples/policy.json](examples/policy.json). Every field is mandatory; unknown fields,
-duplicate JSON keys, non-finite numbers and malformed types are rejected by the CLI loaders.
-Matching is exact and case-sensitive. There are no globs or automatic path normalization.
-Rules authorize the entire parameter space for a tuple; handlers must enforce schemas.
-No match means deny. An explicit deny cannot be overridden by a human approval.
+| Command | Purpose |
+|---|---|
+| `check action.json` | Evaluate policy; exit 0 for allow, 2 for approval/deny |
+| `request action.json --ttl 300` | Create a request that requires approval |
+| `inspect REQUEST_ID` | Display the full request payload/state |
+| `review REQUEST_ID --as operator --approve` | Trusted local review; omit approve to deny |
+| `revoke REQUEST_ID --as operator` | Revoke pending/unconsumed permission |
+| `activate-policy --as operator` | Activate configuration and invalidate every prior generation |
+| `audit` | Show latest metadata events |
+| `backup NEW_PATH` | Snapshot database without migrating it |
+| `restore BACKUP NEW_PATH --as operator` | Restore to a new database and invalidate historical approvals |
+| `export-audit NEW_PATH` | Write metadata JSONL plus a reported checksum |
+| `prune --before UNIX_TIME --as operator` | Preview retention; `--apply` performs deletion |
 
-## Project layout
+Except `check`, successful commands exit 0; operational errors exit 1. Runners exit 2 when
+permission is not executed (denial/expiry/revocation/timeout). New IDs start `req_`; for a
+legacy leading-hyphen ID use `inspect -- -LEGACY_ID`. The CLI intentionally has no arbitrary
+execution endpoint and is not an agent-facing authentication boundary.
 
-```text
-src/agentguard/   Public API, policy, SQLite engine, CLI
-tests/           Authorization, state, parsing, concurrency and CLI regression tests
-examples/        Safe demo, sample policy and action
-docs/            Threat model and operational limits
-.github/         CI for Python 3.11–3.14 and package validation
-```
+## Testing and maintenance
 
-## Build and publish source to GitHub
+The standard-library suite covers policy constraints, action substitution, expiry, reviewer
+authorization, revocation, rollback invalidation, migration rollback, storage failures,
+concurrent consumption, file boundaries, backup/restore and retention. The separate real
+Chromium walkthrough exercises login, note execution, denial, revocation, audit and logout.
 
 ```sh
-python -m pip install build twine
-python -m build
-python -m twine check dist/*
-git init -b main
-git add .
-git commit -m "Add AgentGuard AI secure MVP"
-git remote add origin https://github.com/YOUR_USERNAME/agentguard-ai.git
-git push -u origin main
+python -m unittest discover -s tests -v
+# Optional browser development dependencies only:
+python -m pip install ".[browser]"
+python -m playwright install --with-deps chromium
+python -m unittest discover -s browser_tests -v
 ```
 
-Create the empty public GitHub repository first. If it already contains files, clone it and
-copy these project files into the checkout, review the diff, then commit; do not force-push.
-The package metadata name does not reserve the corresponding name on PyPI. No publishing
-credentials, hosted services or external account setup are included.
+GitHub Actions tests Python 3.11–3.14 on Linux/Windows, validates packages, records browser
+artifacts and runs CodeQL. Dependabot proposes dependency/action updates. These checks are
+useful evidence; they do not constitute an independent security audit.
 
-## Next milestones
+## Documentation
 
-1. Integrate an authenticated reviewer UI and narrow tool adapters.
-2. Add parameter constraint policies, revocation and schema migrations.
-3. Add protected remote audit export and operational metrics.
-4. Release after integration testing and an independent security review.
+- [Quick start](docs/QUICKSTART.md) and [policy reference](docs/POLICIES.md)
+- [Integration tutorial](docs/INTEGRATION.md) and [console demo](docs/DEMO_RUNNER.md)
+- [Dashboard authentication](docs/DASHBOARD.md)
+- [Upgrade, backup, restore and retention](docs/OPERATIONS.md)
+- [Security model](docs/SECURITY_MODEL.md) and [implementation review](docs/REVIEW.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md) and [project status](docs/PROJECT_STATUS.md)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). MIT licensed.
+## Contribute
+
+Real bug reports, reproducible security findings, documentation improvements and focused
+PRs are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately
+through [Security](https://github.com/Maitraiy1/agentguard-ai/security/advisories/new), not
+public issues. See [SECURITY.md](SECURITY.md). No user credentials or action data are sent
+to OpenAI or an external model by this package.

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 — 2026-11-04
+
+### Added
+
+- Strict parameter schemas: exact keys, types, enum allowlists and size/integer bounds.
+- Create-only note integration with separate constrained policy/database and private output.
+- Authenticated reviewer revocation of pending/unconsumed approvals.
+- Durable policy activation generations, including permanent invalidation across policy reverts.
+- Atomic schema-v2 migration, snapshot backup, safe restore to new paths, metadata audit JSONL
+  export/checksum and dry-run retention tooling.
+- Real Chromium walkthrough for login, note execution, denial, revocation, audit and logout;
+  reproducible screenshots and a slowed recording.
+- CodeQL workflow, updated GitHub Actions, Dependabot and issue/PR templates.
+- Integration, policy, upgrade/operations, troubleshooting and candid project/review documentation.
+
+### Compatibility
+
+- **Back up before opening an existing database.** Schema v1 migrates to v2 and invalidates
+  pre-upgrade pending/approved requests. Passwords, terminal history and audit records remain.
+- Old binaries cannot open schema v2. Stop all workers before upgrading.
+- Policy changes require explicit trusted activation; old workers with inactive content fail closed.
+- Runtime remains dependency-free. Playwright is an optional development/CI extra only.
+- This is an early single-user local toolkit; no public hosting, independent audit or adoption
+  claim is added. See OPERATIONS.md and REVIEW.md.
+
 ## 0.2.0 — 2026-11-04
 
 ### Added

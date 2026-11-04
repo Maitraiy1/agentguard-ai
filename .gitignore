@@ -9,3 +9,6 @@ htmlcov/
 .env
 .agentguard/
 *.sqlite3*
+
+artifacts/
+*.webm

@@ -128,6 +128,7 @@ class EngineTests(unittest.TestCase):
     def test_changed_principal_cannot_reuse_approval(self):
         both = Policy(self.policy.rules + (Rule('publish', 'note/1', 'other', Decision.APPROVAL),))
         engine = Engine(self.database, both, reviewers={'human'}, clock=lambda: self.now)
+        engine.activate_policy(actor='operator')
         request_id = engine.request(self.action)
         engine.review(request_id, reviewer='human', approve=True)
         with self.assertRaises(ApprovalError):
@@ -207,6 +208,7 @@ class EngineTests(unittest.TestCase):
     def test_allowed_and_denied(self):
         allowed = Policy((Rule('publish', 'note/1', 'agent', Decision.ALLOW),))
         engine = Engine(self.database, allowed, reviewers=set())
+        engine.activate_policy(actor='operator')
         self.assertEqual(engine.execute(self.action, lambda _: 7), 7)
         with self.assertRaises(ApprovalError):
             engine.request(self.action)

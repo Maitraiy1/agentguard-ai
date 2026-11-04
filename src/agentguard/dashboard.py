@@ -277,6 +277,12 @@ class Handler(BaseHTTPRequestHandler):
                                     f'<input type="hidden" name="request_id" value="{escape(row["id"])}">'
                                     f'<input type="hidden" name="decision" value="{decision}">'
                                     f'<button class="{decision}" type="submit">{text}</button></form>')
+                if self._status(row) in ("pending", "approved"):
+                    content += (f'<form class="inline" method="post" action="/review">'
+                                f'<input type="hidden" name="csrf" value="{escape(session.csrf)}">'
+                                f'<input type="hidden" name="request_id" value="{escape(row["id"])}">'
+                                '<input type="hidden" name="decision" value="revoke">'
+                                '<button class="deny" type="submit">Revoke permission</button></form>')
                 content += '</section>'
             elif path == "/audit":
                 content = ('<h2>Audit history</h2><p class="muted">Latest 100 events, newest first. '
@@ -299,7 +305,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _status(self, row: dict) -> str:
         if row["status"] in ("pending", "approved"):
-            if row["policy"] != self.server.engine.policy.digest:
+            if not row.get("policy_current", True) or row["policy"] != self.server.engine.policy.digest:
                 return "policy changed"
             if self.server.engine.clock() >= row["expires"]:
                 return "expired"
@@ -355,12 +361,15 @@ class Handler(BaseHTTPRequestHandler):
             self.server.logout(token)
             self._send(303, location="/login", cookie=f"{COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")
         elif self.path == "/review" and set(form) == {"csrf", "request_id", "decision"}:
-            if form["decision"] not in ("approve", "deny"):
+            if form["decision"] not in ("approve", "deny", "revoke"):
                 self._send(400, "Unknown decision")
                 return
             try:
-                self.server.engine.review(form["request_id"], reviewer=self.server.credentials.reviewer,
-                                          approve=form["decision"] == "approve")
+                if form["decision"] == "revoke":
+                    self.server.engine.revoke(form["request_id"], reviewer=self.server.credentials.reviewer)
+                else:
+                    self.server.engine.review(form["request_id"], reviewer=self.server.credentials.reviewer,
+                                              approve=form["decision"] == "approve")
             except ApprovalError as error:
                 self._send(409, self._page("Review blocked", f'<h2>Review blocked</h2><p>{escape(error)}</p>', session))
                 return

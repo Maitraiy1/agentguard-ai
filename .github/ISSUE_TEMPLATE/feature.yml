@@ -1,0 +1,16 @@
+name: Feature request
+description: Describe a concrete use case and its security boundary.
+body:
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Problem and use case
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed behavior and security implications
+      description: What inputs are untrusted, who approves actions, and which side effects should be allowed?
+    validations:
+      required: true

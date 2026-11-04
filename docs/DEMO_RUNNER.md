@@ -51,7 +51,7 @@ for that denied request. It is normal for a terminal to report exit code 2 for t
   console handler starts. Reusing the request cannot run the handler again.
 - The handler accepts only its fixed demo tool/resource/principal/parameter tuple. This
   demo is not a general agent command runner and has no arbitrary tool or shell adapter.
-- Denial, expiry, wait timeout and already-consumed state do not start execution. Configuration
+- Denial, revocation, expiry, wait timeout and already-consumed state do not start execution. Configuration
   or storage errors fail closed. A failure after consumption is not retried automatically.
 - Default request lifetime and wait time are 300 seconds; customize with `--ttl 600`
   (allowed range 1–3600). If no decision arrives, rerun to create a new request.
@@ -75,3 +75,6 @@ Global runner options:
 ```
 
 On Linux/macOS, activate your virtual environment and use `python -m agentguard.demo_runner`.
+
+For the real create-only note tool, use QUICKSTART.md. After a v0.3 schema upgrade, old pending
+approvals are invalid; create new requests. See OPERATIONS.md for backup and policy activation.

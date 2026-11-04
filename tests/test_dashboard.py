@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from unittest.mock import patch
 
-from agentguard import Action, Decision, Engine, Policy, Rule
+from agentguard import Action, ApprovalError, Decision, Engine, Policy, Rule
 from agentguard.dashboard import COOKIE, Credentials, Dashboard, main
 
 
@@ -140,6 +140,16 @@ class DashboardTests(unittest.TestCase):
         form = {'csrf': csrf, 'request_id': self.request_id, 'decision': 'approve', 'reviewer': 'agent'}
         self.assertEqual(self.request('POST', '/review', form, cookie)[0], 400)
         self.assertEqual(self.engine.inspect(self.request_id)['status'], 'pending')
+
+    def test_revoke_approved_request_from_dashboard(self):
+        cookie, csrf = self.login()
+        form = {'csrf': csrf, 'request_id': self.request_id, 'decision': 'approve'}
+        self.assertEqual(self.request('POST', '/review', form, cookie)[0], 303)
+        form['decision'] = 'revoke'
+        self.assertEqual(self.request('POST', '/review', form, cookie)[0], 303)
+        self.assertEqual(self.engine.inspect(self.request_id)['status'], 'revoked')
+        with self.assertRaises(ApprovalError):
+            self.engine.execute(self.action, lambda _: self.fail('called'), request_id=self.request_id)
 
     def test_unknown_decision_does_not_mutate(self):
         cookie, csrf = self.login()
