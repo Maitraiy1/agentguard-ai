@@ -1,4 +1,4 @@
-# Local reviewer dashboard (v0.2.0 development preview)
+# Local reviewer dashboard (v0.2.0)
 
 This is a password-authenticated, single-reviewer website for your laptop. It uses the
 existing Engine API and SQLite state. It can list, inspect, approve and deny requests and
