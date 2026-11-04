@@ -49,6 +49,20 @@ Create a password when prompted, open **http://127.0.0.1:8765**, sign in and ins
 request. Use Approve or Deny, then check Audit history. This is an early local preview, not
 a public hosting server. See [Windows setup and authentication details](docs/DASHBOARD.md).
 
+## Full approval-to-execution demo
+
+Keep the local dashboard running. In a second terminal, from this project folder:
+
+```sh
+python -m agentguard.demo_runner
+```
+
+The runner creates a fresh request and waits. Inspect that request in the dashboard and
+approve it: a fixed harmless message prints in the runner terminal, and execution events
+appear in audit history. Deny a new request to verify that nothing runs. No shell commands,
+external messages or output files are produced by the tool. See the
+[two-window Windows walkthrough](docs/DEMO_RUNNER.md).
+
 ## Local CLI
 
 On POSIX first set `umask 077`; on Windows set private NTFS permissions for the state folder.

@@ -37,3 +37,15 @@ approval/denial, expiry, logout, rate limiting, input limits and absence of an e
 The original v0.1.0 CI passed across Linux/Windows on Python 3.11–3.14. The new dashboard's
 Windows and Python matrix results have not yet been verified. This is a development preview,
 not a v0.2.0 release or a completed production security review.
+
+## Approval-to-execution runner
+
+The dashboard merge (80c70d6) was confirmed on main; its 44 tests passed on the user's Windows
+laptop and its CI matrix passed on Linux/Windows with Python 3.11–3.14.
+
+The new runner was validated with all 57 tests passing on Linux CPython 3.12. This includes
+13 runner tests for delayed human approval, denial, expiry, timeout, policy/action changes,
+failed storage, single-use consumption, handler failure and a real HTTP dashboard login/
+review flow connected to a waiting worker. No automatic reviewer decision occurs in the
+shipped runner; test-only reviewer decisions simulate human input. The console handler
+accepts only a fixed demo action and produces no external side effects.
