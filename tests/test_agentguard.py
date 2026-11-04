@@ -1,10 +1,11 @@
-﻿import concurrent.futures
+import concurrent.futures
 import contextlib
 import io
 import json
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from agentguard import Action, ApprovalError, Decision, Engine, Policy, Rule
@@ -272,7 +273,9 @@ class CLITests(unittest.TestCase):
                 return code, output.getvalue(), errors.getvalue()
             self.assertEqual(run(['init'])[0], 0)
             self.assertEqual(run(['check', str(action)])[0], 2)
-            code, output, _ = run(['request', str(action)])
+            # URL-safe randomness can begin with '-' and resemble an argparse flag.
+            with patch('agentguard.engine.secrets.token_urlsafe', return_value='-cli-edge-case'):
+                code, output, _ = run(['request', str(action)])
             self.assertEqual(code, 0)
             request_id = json.loads(output)['request_id']
             self.assertEqual(run(['inspect', request_id])[0], 0)
@@ -285,4 +288,3 @@ class CLITests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
