@@ -49,3 +49,13 @@ failed storage, single-use consumption, handler failure and a real HTTP dashboar
 review flow connected to a waiting worker. No automatic reviewer decision occurs in the
 shipped runner; test-only reviewer decisions simulate human input. The console handler
 accepts only a fixed demo action and produces no external side effects.
+
+## v0.2.0 release preparation
+
+The user verified all 57 tests on Windows after merging PR #2 into main (be755f4).
+The dashboard and runner were exercised manually: approval executed the fixed console tool,
+denial prevented execution, and audit history recorded the decisions and execution events.
+The request-ID fix was verified by a deterministic leading-hyphen regression and successful
+Linux/Windows CI runs across Python 3.11–3.14. Release preparation synchronizes package/API
+versions to 0.2.0 and includes the changelog in the source distribution. No independent
+security audit, public hosting deployment or PyPI publication is claimed.

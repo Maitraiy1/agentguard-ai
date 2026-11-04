@@ -1,5 +1,8 @@
 # AgentGuard AI
 
+Version **0.2.0** adds the local reviewer dashboard and approval-to-execution demo.
+See [CHANGELOG.md](CHANGELOG.md) for release details. This remains an early local MVP.
+
 A small, dependency-free Python gate for AI-agent tools: **deny by default, require human
 approval for selected actions, and record local audit events**.
 
