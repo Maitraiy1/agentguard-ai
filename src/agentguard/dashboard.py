@@ -181,7 +181,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
+        # no-referrer makes browser form POSTs send Origin: null. Preserve the
+        # same-origin form origin without sending referrers to other sites.
+        self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "
                          "form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
         self.send_header("Connection", "close")

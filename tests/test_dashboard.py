@@ -79,6 +79,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn('type="password"', body)
         self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertEqual(headers['Referrer-Policy'], 'same-origin')
         self.assertEqual(headers['X-Frame-Options'], 'DENY')
         self.assertIn("frame-ancestors 'none'", headers['Content-Security-Policy'])
         status, headers, _ = self.request('POST', '/login', {'password': self.password})
