@@ -1,0 +1,7 @@
+{
+  "rules": [
+    {"tool": "notes.read", "resource": "notes/demo", "principal": "demo-agent", "decision": "allow"},
+    {"tool": "notes.publish", "resource": "notes/demo", "principal": "demo-agent", "decision": "approval"},
+    {"tool": "shell.execute", "resource": "host", "principal": "demo-agent", "decision": "deny"}
+  ]
+}

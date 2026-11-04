@@ -1,0 +1,6 @@
+{
+  "tool": "notes.publish",
+  "resource": "notes/demo",
+  "principal": "demo-agent",
+  "parameters": {"text": "Hello from AgentGuard AI"}
+}
