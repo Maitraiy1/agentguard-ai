@@ -160,3 +160,16 @@ class Engine:
         with self._transaction() as db:
             return [dict(row) for row in db.execute(
                 "SELECT * FROM audit ORDER BY sequence DESC LIMIT ?", (limit,))]
+
+    def list_requests(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return newest requests for trusted reviewer interfaces; payloads are sensitive."""
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        with self._transaction() as db:
+            rows = db.execute("SELECT * FROM requests ORDER BY rowid DESC LIMIT ?", (limit,))
+            results = []
+            for row in rows:
+                item = dict(row)
+                item["action"] = json.loads(item["action"])
+                results.append(item)
+            return results
